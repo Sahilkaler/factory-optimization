@@ -1,9 +1,12 @@
 import pandas as pd
+import random
 
 def simulate(df, product, model, encoders):
 
-    # Get selected product row
-    base = df[df['Product Name'] == product].iloc[0].copy()
+    # Random row for selected product
+    base = df[
+        df['Product Name'] == product
+    ].sample(1).iloc[0].copy()
 
     # Factory list
     factories = [
@@ -14,13 +17,22 @@ def simulate(df, product, model, encoders):
         "The Other Factory"
     ]
 
-    # Simulated distances for each factory
+    # Different factory distances
     factory_distances = {
         "Lot's O' Nuts": 300,
         "Wicked Choccy's": 550,
         "Sugar Shack": 850,
         "Secret Factory": 450,
         "The Other Factory": 700
+    }
+
+    # Factory performance impact
+    factory_bonus = {
+        "Lot's O' Nuts": -1.0,
+        "Wicked Choccy's": 0.5,
+        "Sugar Shack": 1.5,
+        "Secret Factory": -0.3,
+        "The Other Factory": 0.8
     }
 
     results = []
@@ -38,14 +50,15 @@ def simulate(df, product, model, encoders):
         ]
 
         for col in categorical_cols:
+
             temp[col] = encoders[col].transform(
                 [str(temp[col])]
             )[0]
 
-        # Different distance for each factory
+        # Assign distance
         temp['distance'] = factory_distances[factory]
 
-        # Features used for prediction
+        # Features
         features = [
             'Ship Mode',
             'Region',
@@ -57,20 +70,32 @@ def simulate(df, product, model, encoders):
             'distance'
         ]
 
-        # Prepare input dataframe
-        input_df = pd.DataFrame([temp[features]])
+        # Input dataframe
+        input_df = pd.DataFrame(
+            [temp[features]]
+        )
 
         # Predict lead time
         pred = model.predict(input_df)[0]
+
+        # Add factory impact
+        pred += factory_bonus[factory]
+
+        # Small randomness
+        pred += random.uniform(-0.3, 0.3)
 
         # Prevent unrealistic values
         pred = max(1, pred)
 
         # Profit calculation
-        base_profit = temp['Sales'] - temp['Cost']
+        base_profit = (
+            temp['Sales'] - temp['Cost']
+        )
 
-        # Adjust profit based on lead time
-        adjusted_profit = base_profit - (pred * 0.5)
+        # Adjusted profit
+        adjusted_profit = (
+            base_profit + (10 - pred)
+            )
 
         results.append({
             'factory': factory,
@@ -79,7 +104,7 @@ def simulate(df, product, model, encoders):
             'profit': round(adjusted_profit, 2)
         })
 
-    # Convert to dataframe
+    # Create dataframe
     results_df = pd.DataFrame(results)
 
     return results_df
